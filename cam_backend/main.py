@@ -39,6 +39,22 @@ from models import (
     StartRecordingIn, RecordingStatus, FileInfo,
 )
 
+from pydantic import BaseModel
+from typing import Optional
+from pathlib import Path
+import os, json
+class AppConfig(BaseModel):
+    server_ip:    str = ""
+    server_port:  str = "8765"
+    scp_user:     str = ""
+    scp_host:     str = ""
+    scp_remote:   str = ""
+    scp_local:    str = ""
+    
+
+CONFIG_APP_FILE = Path(os.getenv("CONFIG_APP_FILE", "app_config.json"))
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 
 app = FastAPI(title="Camera Recorder API", version="1.0.0")
@@ -98,6 +114,20 @@ async def _status_broadcast_loop() -> None:
                 "type": "status_update",
                 "data": manager.all_statuses(),
             })
+
+@app.get("/config")
+async def get_config():
+    """Flutter يطلبها عند كل تشغيل."""
+    if CONFIG_APP_FILE.exists():
+        return AppConfig(**json.loads(CONFIG_APP_FILE.read_text()))
+    return AppConfig()
+
+@app.post("/config")
+async def save_config(cfg: AppConfig):
+    """Flutter يرسلها عند الضغط على Save."""
+    CONFIG_APP_FILE.write_text(
+        json.dumps(cfg.model_dump(), indent=2, ensure_ascii=False))
+    return {"ok": True}
 
 
 @app.on_event("startup")

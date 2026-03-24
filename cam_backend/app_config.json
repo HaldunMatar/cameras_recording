@@ -1,0 +1,8 @@
+{
+  "server_ip": "100.121.60.36",
+  "server_port": "8765",
+  "scp_user": "mini",
+  "scp_host": "100.121.60.36",
+  "scp_remote": "/home/mini/cam_recorder/recordings/",
+  "scp_local": "/Users/haldunmatar/projects/python/ODM/Object-Detection/videos"
+}
