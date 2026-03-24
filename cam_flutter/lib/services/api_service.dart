@@ -62,6 +62,7 @@ class ApiService {
     reconnectWS();
   }
 
+
   Future<void> saveScpConfig({
     required String user,
     required String remoteDir,
@@ -208,4 +209,17 @@ class ApiService {
 
   String snapshotUrl(String camName) =>
       '$baseUrl/stream/$camName/snapshot';
+
+      /// حمّل الإعدادات من السيرفر
+Future<Map<String, dynamic>> loadRemoteConfig() async {
+  final res = await _dio.get<Map<String, dynamic>>('/config');
+  return res.data!;
 }
+
+/// احفظ الإعدادات على السيرفر
+Future<void> saveRemoteConfig(Map<String, dynamic> cfg) async {
+  await _dio.post<void>('/config', data: cfg);
+}
+}
+
+

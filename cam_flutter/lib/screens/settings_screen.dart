@@ -94,6 +94,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _remoteCtrl.text = scp.remotePath;
     _localCtrl.text  = scp.localPath;
 
+
+    _loadFromServer();
+
     _checkHealth();
   }
 
@@ -129,21 +132,49 @@ class _SettingsScreenState extends State<SettingsScreen> {
         const SnackBar(content: Text('API settings saved')));
     }
   }
+// في initState — بعد تحميل الـ API settings العادية:
 
-  Future<void> _saveScp() async {
-    setState(() => _savingScp = true);
-    await ScpConfig().save(
-      user:   _userCtrl.text.trim(),
-      host:   _hostCtrl.text.trim(),
-      remote: _remoteCtrl.text.trim(),
-      local:  _localCtrl.text.trim(),
-    );
-    setState(() => _savingScp = false);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('SCP settings saved')));
-    }
-  }
+Future<void> _loadFromServer() async {
+  try {
+    final cfg = await ApiService().loadRemoteConfig();
+    setState(() {
+      _userCtrl.text   = cfg['scp_user']   ?? '';
+      _hostCtrl.text   = cfg['scp_host']   ?? '';
+      _remoteCtrl.text = cfg['scp_remote'] ?? '';
+      _localCtrl.text  = cfg['scp_local']  ?? '';
+    });
+    // حدّث ScpConfig singleton أيضاً
+    ScpConfig()
+      ..sshUser    = cfg['scp_user']   ?? ''
+      ..sshHost    = cfg['scp_host']   ?? ''
+      ..remotePath = cfg['scp_remote'] ?? ''
+      ..localPath  = cfg['scp_local']  ?? '';
+  } catch (_) {}
+}
+
+Future<void> _saveScp() async {
+  setState(() => _savingScp = true);
+  // احفظ محلياً
+  await ScpConfig().save(
+    user:   _userCtrl.text.trim(),
+    host:   _hostCtrl.text.trim(),
+    remote: _remoteCtrl.text.trim(),
+    local:  _localCtrl.text.trim(),
+  );
+  // واحفظ على السيرفر
+  try {
+    await ApiService().saveRemoteConfig({
+      'server_ip':   ApiService().ip,
+      'server_port': ApiService().port,
+      'scp_user':    _userCtrl.text.trim(),
+      'scp_host':    _hostCtrl.text.trim(),
+      'scp_remote':  _remoteCtrl.text.trim(),
+      'scp_local':   _localCtrl.text.trim(),
+    });
+  } catch (_) {} // إذا فشل السيرفر، الإعدادات المحلية محفوظة
+  setState(() => _savingScp = false);
+}
+
 
   // Preview scp command with a placeholder filename
   String get _scpPreview {
