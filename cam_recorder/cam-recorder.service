@@ -1,0 +1,35 @@
+[Unit]
+Description=Camera Recorder API
+Documentation=https://github.com/your-repo
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=techniaa
+
+# ── Paths ──────────────────────────────────────────────────────────────────
+WorkingDirectory=/home/techniaa/cam_recorder
+
+# ── Environment ────────────────────────────────────────────────────────────
+Environment="RECORDINGS_DIR=/home/techniaa/cam_recorder/recordings"
+Environment="CONFIG_FILE=/home/techniaa/cam_recorder/config.json"
+Environment="HLS_DIR=/tmp/hls"
+
+# ── Process ────────────────────────────────────────────────────────────────
+ExecStart=/home/techniaa/cam_recorder/venv/bin/uvicorn main:app \
+    --host 0.0.0.0 \
+    --port 8765 \
+    --workers 1 \
+    --log-level info
+
+Restart=always
+RestartSec=5
+
+# ── Logging ────────────────────────────────────────────────────────────────
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cam-recorder
+
+[Install]
+WantedBy=multi-user.target
