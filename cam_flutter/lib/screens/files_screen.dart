@@ -129,6 +129,27 @@ class _FilesScreenState extends State<FilesScreen> {
     );
   }
 
+  void _showDeleteRangeSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.bg2,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (_) => _DeleteRangeSheet(
+        camIds: _camIds,
+        onDeleted: (count) {
+          _load();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text('Deleted $count file${count != 1 ? 's' : ''}'),
+            ));
+          }
+        },
+      ),
+    );
+  }
+
   // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
@@ -143,6 +164,10 @@ class _FilesScreenState extends State<FilesScreen> {
               fontSize: 18, fontWeight: FontWeight.w700,
               color: AppColors.text)),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.delete_sweep_rounded, color: AppColors.red),
+            onPressed: _camIds.isEmpty ? null : _showDeleteRangeSheet,
+            tooltip: 'Delete by date range'),
           IconButton(
             icon: const Icon(Icons.refresh_rounded, color: AppColors.text2),
             onPressed: _load, tooltip: 'Refresh'),
@@ -240,6 +265,293 @@ class _FilesScreenState extends State<FilesScreen> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Delete by date range — bottom sheet
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _DeleteRangeSheet extends StatefulWidget {
+  final List<String>        camIds;
+  final void Function(int)  onDeleted;
+
+  const _DeleteRangeSheet({
+    required this.camIds,
+    required this.onDeleted,
+  });
+
+  @override
+  State<_DeleteRangeSheet> createState() => _DeleteRangeSheetState();
+}
+
+class _DeleteRangeSheetState extends State<_DeleteRangeSheet> {
+  late String   _selectedCam;
+  DateTime      _fromDate = DateTime.now().subtract(const Duration(days: 7));
+  DateTime      _toDate   = DateTime.now();
+  bool          _loading  = false;
+  String?       _result;
+  bool          _isError  = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedCam = widget.camIds.first;
+  }
+
+  Future<void> _pickDate({required bool isFrom}) async {
+    final initial = isFrom ? _fromDate : _toDate;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: const ColorScheme.dark(
+            primary: AppColors.red,
+            surface: AppColors.bg2,
+          ),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked == null) return;
+    setState(() {
+      if (isFrom) {
+        _fromDate = picked;
+        if (_toDate.isBefore(_fromDate)) _toDate = _fromDate;
+      } else {
+        _toDate = picked;
+        if (_fromDate.isAfter(_toDate)) _fromDate = _toDate;
+      }
+    });
+  }
+
+  Future<void> _delete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Confirm deletion',
+          style: TextStyle(color: AppColors.text, fontWeight: FontWeight.w700)),
+        content: Text(
+          'Delete all recordings for "$_selectedCam"
+'
+          'from ${_fmt(_fromDate)} to ${_fmt(_toDate)}?
+
+'
+          'This cannot be undone.',
+          style: const TextStyle(color: AppColors.text2, fontSize: 13)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel', style: TextStyle(color: AppColors.text2))),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.red),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() { _loading = true; _result = null; });
+    try {
+      final res = await ApiService().deleteFilesByRange(
+        camName:  _selectedCam,
+        fromDate: _fromDate,
+        toDate:   _toDate,
+      );
+      final deleted = res['deleted_count'] as int;
+      final skipped = res['skipped_count'] as int;
+      setState(() {
+        _loading = false;
+        _isError = false;
+        _result  = 'Deleted $deleted file${deleted != 1 ? 's' : ''}'
+            '${skipped > 0 ? ' · $skipped skipped (recording)' : ''}';
+      });
+      widget.onDeleted(deleted);
+    } catch (e) {
+      setState(() {
+        _loading = false;
+        _isError = true;
+        _result  = e.toString();
+      });
+    }
+  }
+
+  String _fmt(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2,'0')}-${d.day.toString().padLeft(2,'0')}';
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+          20, 16, 20, MediaQuery.of(context).viewInsets.bottom + 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Handle
+          Center(
+            child: Container(
+              width: 40, height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.border2,
+                borderRadius: BorderRadius.circular(2)),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Title
+          const Text('Delete by Date Range',
+            style: TextStyle(
+              fontSize: 16, fontWeight: FontWeight.w700,
+              color: AppColors.text)),
+          const SizedBox(height: 4),
+          const Text('Removes all segments for a camera within a date window.',
+            style: TextStyle(fontSize: 12, color: AppColors.text3)),
+          const SizedBox(height: 20),
+
+          // Camera picker
+          const Text('CAMERA',
+            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700,
+              color: AppColors.text3, letterSpacing: 0.6)),
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: AppColors.bg1,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.border2)),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: _selectedCam,
+                isExpanded: true,
+                dropdownColor: AppColors.bg2,
+                style: const TextStyle(color: AppColors.text, fontSize: 14),
+                items: widget.camIds.map((id) =>
+                  DropdownMenuItem(value: id, child: Text(id))).toList(),
+                onChanged: (v) { if (v != null) setState(() => _selectedCam = v); },
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Date range row
+          Row(
+            children: [
+              Expanded(child: _DateTile(
+                label: 'FROM',
+                date: _fromDate,
+                onTap: () => _pickDate(isFrom: true),
+              )),
+              const SizedBox(width: 12),
+              Expanded(child: _DateTile(
+                label: 'TO',
+                date: _toDate,
+                onTap: () => _pickDate(isFrom: false),
+              )),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // Result message
+          if (_result != null)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              margin: const EdgeInsets.only(bottom: 14),
+              decoration: BoxDecoration(
+                color: _isError
+                    ? AppColors.red.withOpacity(0.08)
+                    : AppColors.blue.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: _isError
+                      ? AppColors.red.withOpacity(0.3)
+                      : AppColors.blue.withOpacity(0.3)),
+              ),
+              child: Text(_result!,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: _isError ? AppColors.red : AppColors.blue)),
+            ),
+
+          // Action buttons
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.text2,
+                    side: const BorderSide(color: AppColors.border2),
+                    minimumSize: const Size.fromHeight(46)),
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Close')),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.red,
+                    minimumSize: const Size.fromHeight(46)),
+                  onPressed: _loading ? null : _delete,
+                  icon: _loading
+                      ? const SizedBox(
+                          width: 14, height: 14,
+                          child: CircularProgressIndicator(
+                            color: Colors.white, strokeWidth: 2))
+                      : const Icon(Icons.delete_sweep_rounded, size: 16),
+                  label: Text(_loading ? 'Deleting…' : 'Delete Files')),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DateTile extends StatelessWidget {
+  final String   label;
+  final DateTime date;
+  final VoidCallback onTap;
+  const _DateTile({required this.label, required this.date, required this.onTap});
+
+  String get _fmt =>
+      '${date.year}-${date.month.toString().padLeft(2,'0')}-${date.day.toString().padLeft(2,'0')}';
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: AppColors.bg1,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.border2)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label,
+            style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w700,
+              color: AppColors.text3, letterSpacing: 0.6)),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              const Icon(Icons.calendar_today_rounded,
+                  size: 13, color: AppColors.text2),
+              const SizedBox(width: 6),
+              Text(_fmt,
+                style: const TextStyle(
+                  fontSize: 13, fontWeight: FontWeight.w600,
+                  color: AppColors.text)),
+            ],
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // File card — horizontal list item
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -306,7 +618,6 @@ class _FileCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Cam + format badge row
                       Row(
                         children: [
                           _Badge(file.camName.toUpperCase()),
@@ -322,14 +633,12 @@ class _FileCard extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 4),
-                      // Filename
                       Text(file.filename,
                         style: const TextStyle(
                           fontSize: 12, fontWeight: FontWeight.w500,
                           color: AppColors.text),
                         overflow: TextOverflow.ellipsis),
                       const SizedBox(height: 2),
-                      // Date + duration
                       Text('${file.dateLabel}  ·  ${file.durationLabel}',
                         style: const TextStyle(
                             fontSize: 10, color: AppColors.text3)),
@@ -338,7 +647,7 @@ class _FileCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 10),
 
-                // Action buttons (hidden while downloading or recording)
+                // Action buttons
                 if (!isRec && !isDl)
                   Row(
                     mainAxisSize: MainAxisSize.min,
@@ -442,7 +751,7 @@ class _FileCard extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SCP bottom sheet — full selectable command + copy button
+// SCP bottom sheet
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _ScpSheet extends StatelessWidget {
@@ -459,7 +768,6 @@ class _ScpSheet extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Handle
           Center(
             child: Container(
               width: 40, height: 4,
@@ -469,7 +777,6 @@ class _ScpSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-
           const Text('SCP command',
             style: TextStyle(
               fontSize: 16, fontWeight: FontWeight.w700,
@@ -488,11 +795,16 @@ class _ScpSheet extends StatelessWidget {
                 border: Border.all(
                     color: AppColors.red.withOpacity(0.25))),
               child: const Text(
-                'SCP not configured.\n'
-                'Go to Settings → SCP / SSH and fill in:\n'
-                '  • SSH user\n'
-                '  • Server host / IP\n'
-                '  • Remote recordings folder\n'
+                'SCP not configured.
+'
+                'Go to Settings → SCP / SSH and fill in:
+'
+                '  • SSH user
+'
+                '  • Server host / IP
+'
+                '  • Remote recordings folder
+'
                 '  • Local destination folder',
                 style: TextStyle(fontSize: 12, color: AppColors.text2),
               ),
@@ -505,7 +817,6 @@ class _ScpSheet extends StatelessWidget {
               onPressed: () => Navigator.pop(context),
               child: const Text('Close')),
           ] else ...[
-            // Full selectable command
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(14),
@@ -527,7 +838,6 @@ class _ScpSheet extends StatelessWidget {
               'Long-press to select text, or tap Copy.',
               style: TextStyle(fontSize: 11, color: AppColors.text3)),
             const SizedBox(height: 14),
-
             Row(
               children: [
                 Expanded(
