@@ -34,7 +34,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from recorder import RecorderManager, HLS_DIR
+from recorder import RecorderManager, HLS_DIR, RECORDINGS_DIR
 from models import (
     CameraIn, CameraInfo,
     StartRecordingIn, RecordingStatus, FileInfo,
@@ -269,7 +269,7 @@ async def delete_files_by_range(body: DeleteRangeIn):
     Files currently being recorded are skipped and reported in 'skipped'.
     Body: { "cam_name": "entrance1", "from_date": "2025-06-01", "to_date": "2025-06-11" }
     """
-    recordings_dir = Path(manager.recordings_dir)
+    recordings_dir = RECORDINGS_DIR
     deleted = []
     skipped = []
 
