@@ -18,6 +18,7 @@ GET  /recordings/status          → all statuses (dict)
 GET  /recordings/status/{name}   → single camera status
 
 GET  /files                      → list recordings (?cam_name=filter)
+DEL  /files/range                → delete files for a camera between two dates
 DEL  /files/{filename}           → delete one file
 DEL  /files                      → delete many (body: list[str])
 GET  /files/{filename}/download  → stream MP4 to Flutter
@@ -37,12 +38,15 @@ from recorder import RecorderManager, HLS_DIR
 from models import (
     CameraIn, CameraInfo,
     StartRecordingIn, RecordingStatus, FileInfo,
+    DeleteRangeIn,
 )
 
 from pydantic import BaseModel
 from typing import Optional
 from pathlib import Path
+from datetime import datetime
 import os, json
+
 class AppConfig(BaseModel):
     server_ip:    str = ""
     server_port:  str = "8765"
@@ -256,6 +260,48 @@ async def list_files(cam_name: str | None = None):
     Flutter FilesScreen calls this on load, refresh, and after filter changes.
     """
     return manager.list_files(cam_name)
+
+
+@app.delete("/files/range")
+async def delete_files_by_range(body: DeleteRangeIn):
+    """
+    Delete all recording files for a specific camera between two dates (inclusive).
+    Files currently being recorded are skipped and reported in 'skipped'.
+    Body: { "cam_name": "entrance1", "from_date": "2025-06-01", "to_date": "2025-06-11" }
+    """
+    recordings_dir = Path(manager.recordings_dir)
+    deleted = []
+    skipped = []
+
+    for ext in ("*.mp4", "*.ts"):
+        for filepath in recordings_dir.glob(ext):
+            stem = filepath.stem
+            # Extract camera name using the same _20 split pattern as RecorderManager
+            if "_20" not in stem:
+                continue
+            file_cam = stem.split("_20")[0]
+            if file_cam != body.cam_name:
+                continue
+            # Parse date from filename: cam_name_YYYY-MM-DD_HH-MM-SS
+            try:
+                date_part = "_20" + stem.split("_20", 1)[1]
+                file_date = datetime.strptime(date_part, "_%Y-%m-%d_%H-%M-%S").date()
+            except ValueError:
+                continue
+            if not (body.from_date <= file_date <= body.to_date):
+                continue
+            ok, msg = manager.delete_file(filepath.name)
+            if ok:
+                deleted.append(filepath.name)
+            else:
+                skipped.append({"filename": filepath.name, "reason": msg})
+
+    return {
+        "deleted": deleted,
+        "deleted_count": len(deleted),
+        "skipped": skipped,
+        "skipped_count": len(skipped),
+    }
 
 
 @app.delete("/files/{filename}")
