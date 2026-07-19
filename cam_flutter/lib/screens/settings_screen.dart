@@ -81,11 +81,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _localCtrl  = TextEditingController();
   bool _savingScp = false;
 
+  /// Returns the Tailscale IP from the browser URL if not already configured.
+  String _detectServerIp(String savedIp) {
+    if (savedIp.isNotEmpty) return savedIp;
+    final host = Uri.base.host;
+    if (host.startsWith('100.')) return host;
+    return savedIp;
+  }
+
   @override
   void initState() {
     super.initState();
     final api = ApiService();
-    _ipCtrl.text   = api.ip;
+    _ipCtrl.text   = _detectServerIp(api.ip);
     _portCtrl.text = api.port;
 
     final scp = ScpConfig();
