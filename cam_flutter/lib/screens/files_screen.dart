@@ -331,12 +331,7 @@ class _DeleteRangeSheetState extends State<_DeleteRangeSheet> {
         title: const Text('Confirm deletion',
           style: TextStyle(color: AppColors.text, fontWeight: FontWeight.w700)),
         content: Text(
-          'Delete all recordings for "$_selectedCam"
-'
-          'from ${_fmt(_fromDate)} to ${_fmt(_toDate)}?
-
-'
-          'This cannot be undone.',
+          'Delete all recordings for "$_selectedCam"\nfrom ${_fmt(_fromDate)} to ${_fmt(_toDate)}?\n\nThis cannot be undone.',
           style: const TextStyle(color: AppColors.text2, fontSize: 13)),
         actions: [
           TextButton(
