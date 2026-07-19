@@ -23,6 +23,7 @@ cam_flutter/.dart_tool/
 cam_flutter/.flutter-plugins
 cam_flutter/.flutter-plugins-dependencies
 cam_flutter/build/
+!cam_flutter/build/web/
 cam_flutter/pubspec.lock
 
 # ── Node / dash_admin ─────────────────────────────────────────────────────────
