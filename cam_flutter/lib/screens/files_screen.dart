@@ -790,17 +790,7 @@ class _ScpSheet extends StatelessWidget {
                 border: Border.all(
                     color: AppColors.red.withOpacity(0.25))),
               child: const Text(
-                'SCP not configured.
-'
-                'Go to Settings → SCP / SSH and fill in:
-'
-                '  • SSH user
-'
-                '  • Server host / IP
-'
-                '  • Remote recordings folder
-'
-                '  • Local destination folder',
+                'SCP not configured.\nGo to Settings → SCP / SSH and fill in:\n  • SSH user\n  • Server host / IP\n  • Remote recordings folder\n  • Local destination folder',
                 style: TextStyle(fontSize: 12, color: AppColors.text2),
               ),
             ),

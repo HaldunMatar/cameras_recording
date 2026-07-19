@@ -27,8 +27,8 @@ cam_flutter/build/
 cam_flutter/pubspec.lock
 
 # ── Node / dash_admin ─────────────────────────────────────────────────────────
-dash_admin/node_modules/
-dash_admin/.env
+# dash_admin/node_modules/
+# dash_admin/.env
 
 # ── macOS ─────────────────────────────────────────────────────────────────────
 .DS_Store

@@ -1,0 +1,14 @@
+  Useful commands:
+  sudo systemctl status  cam-recorder
+  sudo systemctl status  cam-dashboard
+  sudo systemctl restart cam-recorder
+  sudo systemctl restart cam-dashboard
+  journalctl -u cam-recorder  -f
+  journalctl -u cam-dashboard -f
+ bash setup.sh
+
+
+ RecorderManager
+
+
+ CameraRecorder
