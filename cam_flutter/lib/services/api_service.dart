@@ -26,12 +26,10 @@ class ApiService {
   bool get configured => _ip.isNotEmpty;
 
   // ── SCP config ────────────────────────────────────────────────────────────
-  String scpUser      = '';   // e.g. mini
-  String scpRemoteDir = '';   // e.g. /home/mini/cam_recorder/recordings
-  String scpLocalDir  = '';   // e.g. /Users/haldun/videos
+  String scpUser      = '';
+  String scpRemoteDir = '';
+  String scpLocalDir  = '';
 
-  /// Build the scp command for a given filename.
-  /// Returns null if any required field is empty.
   String? scpCommand(String filename) {
     if (scpUser.isEmpty || _ip.isEmpty || scpRemoteDir.isEmpty || scpLocalDir.isEmpty) {
       return null;
@@ -61,7 +59,6 @@ class ApiService {
     _rebuildDio();
     reconnectWS();
   }
-
 
   Future<void> saveScpConfig({
     required String user,
@@ -184,8 +181,28 @@ class ApiService {
   Future<void> deleteFile(String filename) async =>
       _dio.delete<void>('/files/${Uri.encodeComponent(filename)}');
 
-  /// Web  → triggers browser Save dialog (no local path returned).
-  /// Other → streams file to documents folder, returns local path.
+  /// Delete all recordings for [camName] between [fromDate] and [toDate] inclusive.
+  /// Returns a map with keys: deleted (List), deleted_count, skipped (List), skipped_count.
+  Future<Map<String, dynamic>> deleteFilesByRange({
+    required String camName,
+    required DateTime fromDate,
+    required DateTime toDate,
+  }) async {
+    String fmt(DateTime d) =>
+        '${d.year.toString().padLeft(4,'0')}-'
+        '${d.month.toString().padLeft(2,'0')}-'
+        '${d.day.toString().padLeft(2,'0')}';
+    final r = await _dio.delete<Map<String, dynamic>>(
+      '/files/range',
+      data: {
+        'cam_name':  camName,
+        'from_date': fmt(fromDate),
+        'to_date':   fmt(toDate),
+      },
+    );
+    return r.data!;
+  }
+
   Future<String> downloadFile(
     String filename, {
     void Function(double)? onProgress,
@@ -210,16 +227,12 @@ class ApiService {
   String snapshotUrl(String camName) =>
       '$baseUrl/stream/$camName/snapshot';
 
-      /// حمّل الإعدادات من السيرفر
-Future<Map<String, dynamic>> loadRemoteConfig() async {
-  final res = await _dio.get<Map<String, dynamic>>('/config');
-  return res.data!;
-}
+  Future<Map<String, dynamic>> loadRemoteConfig() async {
+    final res = await _dio.get<Map<String, dynamic>>('/config');
+    return res.data!;
+  }
 
-/// احفظ الإعدادات على السيرفر
-Future<void> saveRemoteConfig(Map<String, dynamic> cfg) async {
-  await _dio.post<void>('/config', data: cfg);
+  Future<void> saveRemoteConfig(Map<String, dynamic> cfg) async {
+    await _dio.post<void>('/config', data: cfg);
+  }
 }
-}
-
-
