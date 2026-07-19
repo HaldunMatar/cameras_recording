@@ -184,6 +184,8 @@ class _CamerasScreenState extends State<CamerasScreen> {
             status:     _statuses[cam.name],
             isSelected: _selected.contains(cam.name),
             onTap:      () => _toggle(cam),
+            onEdit:     () => _showEditCamera(cam),
+            onDelete:   () => _deleteCamera(cam),
           );
         },
       ),
@@ -255,6 +257,89 @@ class _CamerasScreenState extends State<CamerasScreen> {
       ),
     );
   }
+
+  Future<void> _deleteCamera(CameraInfo cam) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Delete camera?',
+          style: TextStyle(color: AppColors.text, fontWeight: FontWeight.w700)),
+        content: Text('Remove "${cam.displayName}" from the list?',
+          style: const TextStyle(color: AppColors.text2, fontSize: 13)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel', style: TextStyle(color: AppColors.text2))),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.red),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await ApiService().removeCamera(cam.name);
+      _load();
+    } catch (e) {
+      _snack('Delete failed: $e', error: true);
+    }
+  }
+
+  void _showEditCamera(CameraInfo cam) {
+    final urlCtrl   = TextEditingController(text: cam.rtspUrl);
+    final labelCtrl = TextEditingController(text: cam.label ?? '');
+    bool saving = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, set) => AlertDialog(
+          title: Text('Edit ${cam.displayName}',
+            style: const TextStyle(color: AppColors.text, fontWeight: FontWeight.w700)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _Field(ctrl: labelCtrl, label: 'Display name'),
+              const SizedBox(height: 10),
+              _Field(ctrl: urlCtrl, label: 'RTSP URL', maxLines: 2),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel', style: TextStyle(color: AppColors.text2))),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: AppColors.red),
+              onPressed: saving ? null : () async {
+                if (urlCtrl.text.trim().isEmpty) return;
+                set(() => saving = true);
+                try {
+                  await ApiService().addCamera(
+                    name:    cam.name,
+                    rtspUrl: urlCtrl.text.trim(),
+                    label:   labelCtrl.text.trim().isEmpty ? null : labelCtrl.text.trim(),
+                  );
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  _load();
+                } catch (e) {
+                  set(() => saving = false);
+                  if (ctx.mounted) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      SnackBar(content: Text('$e')));
+                  }
+                }
+              },
+              child: saving
+                  ? const SizedBox(
+                      width: 16, height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('Save')),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -266,12 +351,16 @@ class _CameraCard extends StatelessWidget {
   final RecStatus?   status;
   final bool         isSelected;
   final VoidCallback onTap;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
   const _CameraCard({
     required this.camera,
     required this.status,
     required this.isSelected,
     required this.onTap,
+    required this.onEdit,
+    required this.onDelete,
   });
 
   @override
@@ -385,7 +474,30 @@ class _CameraCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
-              _StatusPill(camera: camera, isRecording: isRec),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  _StatusPill(camera: camera, isRecording: isRec),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _CardBtn(
+                        icon: Icons.edit_outlined,
+                        tooltip: 'Edit',
+                        onTap: onEdit,
+                      ),
+                      const SizedBox(width: 6),
+                      _CardBtn(
+                        icon: Icons.delete_outline_rounded,
+                        tooltip: 'Delete',
+                        danger: true,
+                        onTap: onDelete,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ],
           ),
         ),
@@ -405,6 +517,37 @@ class _CameraCard extends StatelessWidget {
   }
 
   String _p(int n) => n.toString().padLeft(2, '0');
+}
+
+class _CardBtn extends StatelessWidget {
+  final IconData     icon;
+  final String       tooltip;
+  final bool         danger;
+  final VoidCallback onTap;
+
+  const _CardBtn({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+    this.danger = false,
+  });
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+    message: tooltip,
+    child: GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 28, height: 28,
+        decoration: BoxDecoration(
+          color: AppColors.bg2,
+          borderRadius: BorderRadius.circular(7),
+          border: Border.all(color: AppColors.border2)),
+        child: Icon(icon, size: 14,
+          color: danger ? AppColors.red : AppColors.text2),
+      ),
+    ),
+  );
 }
 
 class _StatusPill extends StatefulWidget {
