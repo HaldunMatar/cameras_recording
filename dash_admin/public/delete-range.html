@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Delete Recordings by Date Range</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      background: #1e293b;
+      border-radius: 16px;
+      padding: 36px;
+      width: 100%;
+      max-width: 520px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+    h1 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+      color: #f8fafc;
+    }
+    p.subtitle {
+      font-size: 0.875rem;
+      color: #94a3b8;
+      margin-bottom: 28px;
+    }
+    .field { margin-bottom: 20px; }
+    label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+    }
+    input, select {
+      width: 100%;
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid #334155;
+      background: #0f172a;
+      color: #e2e8f0;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input:focus, select:focus { border-color: #6366f1; }
+    .row { display: flex; gap: 16px; }
+    .row .field { flex: 1; }
+    button {
+      width: 100%;
+      padding: 13px;
+      border-radius: 10px;
+      border: none;
+      background: #ef4444;
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.2s, opacity 0.2s;
+      margin-top: 8px;
+    }
+    button:hover:not(:disabled) { background: #dc2626; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .result {
+      margin-top: 24px;
+      border-radius: 10px;
+      padding: 16px 20px;
+      font-size: 0.9rem;
+      display: none;
+    }
+    .result.success { background: #14532d; border: 1px solid #16a34a; }
+    .result.error   { background: #450a0a; border: 1px solid #dc2626; }
+    .result h3 { font-size: 1rem; margin-bottom: 10px; }
+    .result ul { padding-left: 18px; }
+    .result ul li { margin-bottom: 4px; font-size: 0.82rem; color: #cbd5e1; }
+    .spinner {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border: 2px solid #fff4;
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .server-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 28px;
+    }
+    .server-row input { flex: 1; }
+    .server-row button {
+      width: auto;
+      padding: 10px 16px;
+      font-size: 0.85rem;
+      margin-top: 0;
+      background: #334155;
+    }
+    .server-row button:hover { background: #475569; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h1>🗑️ Delete Recordings by Date Range</h1>
+  <p class="subtitle">Remove all files for a specific camera within a date window.</p>
+
+  <div class="field">
+    <label>Backend API URL</label>
+    <div class="server-row">
+      <input id="apiUrl" type="text" value="http://localhost:8765" placeholder="http://SERVER_IP:8765"/>
+      <button onclick="loadCameras()">Load Cameras</button>
+    </div>
+  </div>
+
+  <div class="field">
+    <label>Camera</label>
+    <select id="camName">
+      <option value="">— click Load Cameras first —</option>
+    </select>
+  </div>
+
+  <div class="row">
+    <div class="field">
+      <label>From Date</label>
+      <input type="date" id="fromDate"/>
+    </div>
+    <div class="field">
+      <label>To Date</label>
+      <input type="date" id="toDate"/>
+    </div>
+  </div>
+
+  <button id="deleteBtn" onclick="deleteRange()" disabled>Delete Files</button>
+
+  <div class="result" id="result"></div>
+</div>
+
+<script>
+  const $ = id => document.getElementById(id);
+
+  async function loadCameras() {
+    const url = $('apiUrl').value.replace(/\/$/, '');
+    try {
+      const res = await fetch(`${url}/cameras`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const cameras = await res.json();
+      const sel = $('camName');
+      sel.innerHTML = cameras.length
+        ? cameras.map(c => `<option value="${c.name}">${c.label || c.name} (${c.name})</option>`).join('')
+        : '<option value="">No cameras found</option>';
+      $('deleteBtn').disabled = cameras.length === 0;
+    } catch (e) {
+      showResult('error', 'Could not load cameras', [`${e.message} — check the API URL and make sure the backend is running.`], []);
+    }
+  }
+
+  async function deleteRange() {
+    const url      = $('apiUrl').value.replace(/\/$/, '');
+    const cam_name = $('camName').value;
+    const from_date = $('fromDate').value;
+    const to_date   = $('toDate').value;
+
+    if (!cam_name)   return alert('Please select a camera.');
+    if (!from_date)  return alert('Please select a From date.');
+    if (!to_date)    return alert('Please select a To date.');
+    if (from_date > to_date) return alert('From date must be before or equal to To date.');
+
+    if (!confirm(`Delete ALL recordings for "${cam_name}" from ${from_date} to ${to_date}?
+
+This cannot be undone.`)) return;
+
+    const btn = $('deleteBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Deleting…';
+
+    try {
+      const res = await fetch(`${url}/files/range`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cam_name, from_date, to_date }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+
+      const skippedMsgs = data.skipped.map(s => `${s.filename} — ${s.reason}`);
+      showResult(
+        'success',
+        `✅ Deleted ${data.deleted_count} file(s)` + (data.skipped_count ? ` · ${data.skipped_count} skipped` : ''),
+        data.deleted,
+        skippedMsgs
+      );
+    } catch (e) {
+      showResult('error', 'Error', [e.message], []);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = 'Delete Files';
+    }
+  }
+
+  function showResult(type, title, deleted, skipped) {
+    const el = $('result');
+    el.className = `result ${type}`;
+    el.style.display = 'block';
+    let html = `<h3>${title}</h3>`;
+    if (deleted.length) {
+      html += `<ul>${deleted.map(f => `<li>🗑 ${f}</li>`).join('')}</ul>`;
+    }
+    if (skipped.length) {
+      html += `<p style="margin-top:10px;color:#fbbf24;font-size:.8rem;">Skipped (currently recording):</p>`;
+      html += `<ul>${skipped.map(s => `<li>⏭ ${s}</li>`).join('')}</ul>`;
+    }
+    el.innerHTML = html;
+  }
+
+  // Set today as default To date, 7 days ago as From
+  const today = new Date();
+  const weekAgo = new Date(today); weekAgo.setDate(today.getDate() - 7);
+  $('toDate').value   = today.toISOString().slice(0,10);
+  $('fromDate').value = weekAgo.toISOString().slice(0,10);
+</script>
+</body>
+</html>
