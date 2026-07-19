@@ -1,0 +1,40 @@
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+venv/
+.venv/
+env/
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ── Backend runtime ───────────────────────────────────────────────────────────
+cam_backend/recordings/
+cam_backend/config.json
+cam_backend/app_config.json
+/tmp/hls/
+
+# ── Flutter ───────────────────────────────────────────────────────────────────
+cam_flutter/.dart_tool/
+cam_flutter/.flutter-plugins
+cam_flutter/.flutter-plugins-dependencies
+cam_flutter/build/
+cam_flutter/pubspec.lock
+
+# ── Node / dash_admin ─────────────────────────────────────────────────────────
+dash_admin/node_modules/
+dash_admin/.env
+
+# ── macOS ─────────────────────────────────────────────────────────────────────
+.DS_Store
+**/.DS_Store
+
+# ── VS Code ───────────────────────────────────────────────────────────────────
+.vscode/
+
+# ── Logs ─────────────────────────────────────────────────────────────────────
+*.log
