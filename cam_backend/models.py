@@ -2,7 +2,7 @@
 Pydantic schemas — field names match the Flutter model fromJson() keys exactly.
 """
 from __future__ import annotations
-from datetime import time as dt_time
+from datetime import time as dt_time, date
 from enum import Enum
 from typing import Optional
 from pydantic import BaseModel, Field
@@ -102,3 +102,12 @@ class FileInfo(BaseModel):
     created_at:       str
     duration_seconds: Optional[int] = None
     is_recording:     bool          = False
+
+
+# ── Delete by date range ──────────────────────────────────────────────────────
+
+class DeleteRangeIn(BaseModel):
+    """DELETE /files/range body"""
+    cam_name:  str
+    from_date: date
+    to_date:   date
